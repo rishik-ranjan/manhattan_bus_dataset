@@ -1,12 +1,110 @@
 <html>
   <head>
-	<title> Stock plot </title>
-	<link rel="stylesheet" href="http://cdn.pydata.org/bokeh/release/bokeh-0.10.0.min.css" type="text/css" />
-	<script type="text/javascript" src="http://cdn.pydata.org/bokeh/release/bokeh-0.10.0.min.js"></script>
+    <title> Vizualization exercise </title>
+    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+    <script src="{{url_for('static',filename='d3.min.js')}}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
   </head>
-	  <body>
-	    <div class=bokeh>
-	      <h1>Plot from Quandl data <a href="/index">Back</a> </h1>
-	    </div>
-	  </body>
+  <body>
+  <script>
+    window.timeVScount = {{ ans1 | safe}};
+    window.convertPlotData = function(data){
+      var convertedData = [];
+      for(var i in data[Object.keys(data)[0]]){
+        var convertedDatum = {};
+        for(var key in data){
+          convertedDatum[key] = data[key][i];
+        }
+        convertedData.push(convertedDatum);
+      }
+      return convertedData;
+    }
+  </script>
+  <script>
+    window.Chart = function(d3,data,name){
+      var selector = "#" + name;
+      this.data = data;
+      // first thing we want to do is setup our viewport
+      var containerWidth = 764;
+      var containerHeight = 504;
+      $(selector).width(containerWidth+"px");
+      $(selector).height(containerHeight+"px");
+
+      var margin = {top: 20, right: 20, bottom: 20, left: 60};
+      this.width = containerWidth - margin.left - margin.right;
+      this.height = containerHeight - margin.top - margin.bottom;
+      this.svg = d3.select(selector).append("svg")
+	.style("position","relative")
+	.attr("width",containerWidth+"px")
+	.attr("height",containerHeight+"px")
+	.append("g") //D3 returns us this "g" element, it will be our main canvas
+	.attr("transform","translate(" + margin.left + ","+margin.top+")"); //axes will go in margins
+
+      //D3 likes passing functions around, making these useful
+      this.xVals = function(d){return d.minutes;};
+      this.yVals = function(d){return d.vehicle_id;};
+
+      //set the min/max values of our axes
+      //the 1 is for a bit of padding
+      this.xScale = d3.scaleLinear()
+	.range([0,this.width])
+	.domain([d3.min(this.data,this.xVals)-1,d3.max(this.data,this.xVals)+1]);
+      this.xMap = _.compose(this.xScale,this.xVals);
+
+      //same thing for y axis
+      this.yScale = d3.scaleLinear()
+	.range([this.height,0])
+	.domain([d3.min(this.data,this.yVals)-1,d3.max(this.data,this.yVals)+1]);
+      this.yMap = _.compose(this.yScale,this.yVals);
+    };
+  </script>
+  <script>
+    window.ChartAxes = function(d3,data,name){
+      window.Chart.call(this,d3,data,name);
+      //d3 has an axis function
+      this.xAxis = d3.axisBottom().scale(this.xScale)
+      this.yAxis = d3.axisLeft().scale(this.yScale)
+
+      //x-axis
+      this.svg.append("g")
+	.attr("class","x axis")
+	.attr("transform","translate(0,"+this.height+")")
+	.call(this.xAxis)
+	.append("text")
+	.attr("class","label")
+	.attr("x",this.width)
+	.attr("y",-30)
+	.style("text-anchor","end")
+	.text("Minutes past selected time");
+
+      //y-axis
+      this.svg.append("g")
+	.attr("class","y axis")
+	.call(this.yAxis)
+	.append("text")
+	.attr("class","label")
+	.attr("transform","rotate(-90)")
+	.attr("y",0)
+	.attr("dy","1em")
+	.style("text-anchor","end")
+	.text("Bus Count");
+    }
+  </script>
+  <script>
+    $(document).ready(function(){
+      //var data = window.convertPlotData(window.timeVScount);
+      var chart = new window.ChartAxes(d3,window.timeVScount,"chart2");
+      //this is the core "D3" step
+      chart.svg.selectAll(".dot") //note this begins as empty selection
+      .data(chart.data) //data-binding step! this selection is now bound to the elements in our data array
+      .enter()
+      .append("circle") //1 for each new node
+      .attr("class","dot")
+      .attr("r",3.5)//radius
+      .attr("cx", chart.xMap)
+      .attr("cy", chart.yMap)
+    });
+  </script>
+  <div id="chart2"></div>
+  </body>
 </html>
